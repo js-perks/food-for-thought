@@ -15,7 +15,7 @@ header {
 }
 
 div {
-    background: #052752;
+    background: #094593;
     color: white;
     text-align: center;
     padding: 10px;
@@ -39,15 +39,34 @@ div {
 main {
     text-align: center;
     font-size: 20px;
-    list-style: none;
     line-height: 30px;
     color: white;
-    background: #0b4080;
+    background: linear-gradient(90deg, #004aad, #06b6d4);
     padding: 30px;
 }
 
+div {
+    padding: 17px;
+    text-align: center;
+    font-size: 17px;
+    list-style: none;
+    background: linear-gradient(90deg, #004aad, #06b6d4);
+}
+
+.cookie-popup {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #032045;
+    color: white;
+    padding: 16px 20px;
+    border-radius: 8px;
+    text-align: center;
+}
+
 footer {
-    margin-top: 20px;
+    margin-top: 2px;
     text-align: center;
     background-color: #0313fd;   
 }
