@@ -6,32 +6,80 @@ const searchInput = document.getElementById('searchinput');
 
 // Listen for form submission
 form.addEventListener('submit', function(event) {
-    // Prevent page refresh
     event.preventDefault();
     
-    // Get what the user typed
     const searchTerm = searchInput.value.trim();
     
-    // Make sure they typed something
     if (searchTerm === '') {
         alert('Please enter a food item!');
         return;
     }
     
-    // Search for recipes
     searchRecipes(searchTerm);
 });
 
+// Function to show loading icon
+function showLoading() {
+    let loadingDiv = document.getElementById('loading');
+    if (!loadingDiv) {
+        loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.style.textAlign = 'center';
+        loadingDiv.style.padding = '40px';
+        
+        // Create spinner
+        const spinner = document.createElement('div');
+        spinner.style.border = '8px solid #f3f3f3';
+        spinner.style.borderTop = '8px solid #064f8f';
+        spinner.style.borderRadius = '50%';
+        spinner.style.width = '60px';
+        spinner.style.height = '60px';
+        spinner.style.animation = 'spin 1s linear infinite';
+        spinner.style.margin = '0 auto 20px';
+        
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        const text = document.createElement('p');
+        text.textContent = 'Searching for recipes...';
+        text.style.color = 'white';
+        text.style.fontSize = '18px';
+        
+        loadingDiv.appendChild(spinner);
+        loadingDiv.appendChild(text);
+        document.body.appendChild(loadingDiv);
+    }
+    loadingDiv.style.display = 'block';
+}
+
+// Function to hide loading icon
+function hideLoading() {
+    const loadingDiv = document.getElementById('loading');
+    if (loadingDiv) {
+        loadingDiv.style.display = 'none';
+    }
+}
+
 // Function to fetch recipes from the API
 async function searchRecipes(searchTerm) {
+    // Show loading
+    showLoading();
+    
     try {
-        // Split by commas if user entered multiple ingredients
-        const ingredients = searchTerm.split(',').map(item => item.trim());
+        // Split by commas and clean up
+        const userIngredients = searchTerm.split(',').map(item => item.trim().toLowerCase());
         
         let allMeals = [];
         
         // Search for each ingredient
-        for (let ingredient of ingredients) {
+        for (let ingredient of userIngredients) {
             const response = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?i=${ingredient}`);
             const data = await response.json();
             
@@ -40,28 +88,58 @@ async function searchRecipes(searchTerm) {
             }
         }
         
-        // Remove duplicates by meal ID
-        const uniqueMeals = [];
-        const seenIds = new Set();
+        // Remove duplicates and get full details
+        const uniqueMealIds = [...new Set(allMeals.map(meal => meal.idMeal))];
+        const rankedMeals = [];
         
-        for (let meal of allMeals) {
-            if (!seenIds.has(meal.idMeal)) {
-                seenIds.add(meal.idMeal);
-                uniqueMeals.push(meal);
+        for (let mealId of uniqueMealIds) {
+            const response = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${mealId}`);
+            const data = await response.json();
+            
+            if (data.meals && data.meals[0]) {
+                const recipe = data.meals[0];
+                
+                // Get all ingredients from this recipe
+                const recipeIngredients = [];
+                for (let i = 1; i <= 20; i++) {
+                    const ingredient = recipe[`strIngredient${i}`];
+                    if (ingredient && ingredient.trim() !== '') {
+                        recipeIngredients.push(ingredient.toLowerCase());
+                    }
+                }
+                
+                // Count how many user ingredients are in this recipe
+                let matchCount = 0;
+                for (let userIng of userIngredients) {
+                    for (let recipeIng of recipeIngredients) {
+                        if (recipeIng.includes(userIng)) {
+                            matchCount++;
+                            break;
+                        }
+                    }
+                }
+                
+                // Add match count to the recipe
+                recipe.matchCount = matchCount;
+                rankedMeals.push(recipe);
             }
         }
         
-        // Display the results
-        displayResults(uniqueMeals);
+        // Sort by match count (highest first)
+        rankedMeals.sort((a, b) => b.matchCount - a.matchCount);
+        
+        // Hide loading before displaying results
+        hideLoading();
+        displayResults(rankedMeals, userIngredients.length);
         
     } catch (error) {
+        hideLoading();
         alert('Error fetching recipes. Please try again!');
     }
 }
 
 // Function to display the results on the page
-function displayResults(meals) {
-    // Find or create a results container
+function displayResults(meals, totalIngredients) {
     let resultsDiv = document.getElementById('results');
     if (!resultsDiv) {
         resultsDiv = document.createElement('div');
@@ -69,25 +147,22 @@ function displayResults(meals) {
         document.body.appendChild(resultsDiv);
     }
     
-    // Clear previous results
     resultsDiv.innerHTML = '';
     
-    // Check if we found any recipes
     if (!meals || meals.length === 0) {
         resultsDiv.innerHTML = '<p style="color: white; padding: 20px;">No recipes found. Try searching for something else!</p>';
         return;
     }
     
-    // Show how many results
+    // Show count
     const resultCount = document.createElement('h2');
     resultCount.textContent = `Found ${meals.length} Recipe(s)`;
     resultCount.style.color = 'white';
     resultCount.style.padding = '20px';
     resultsDiv.appendChild(resultCount);
     
-    // Create HTML for each recipe (simplified - just showing basics)
+    // Create HTML for each recipe
     meals.forEach(meal => {
-        // Create a div for each recipe
         const recipeDiv = document.createElement('div');
         recipeDiv.style.border = '2px solid #064f8f';
         recipeDiv.style.margin = '20px';
@@ -95,46 +170,38 @@ function displayResults(meals) {
         recipeDiv.style.backgroundColor = '#083368';
         recipeDiv.style.cursor = 'pointer';
         
-        // Recipe Title
+        // Match indicator
+        const matchBadge = document.createElement('div');
+        matchBadge.textContent = `✓ ${meal.matchCount}/${totalIngredients} ingredients`;
+        matchBadge.style.color = '#4CAF50';
+        matchBadge.style.fontWeight = 'bold';
+        matchBadge.style.marginBottom = '10px';
+        recipeDiv.appendChild(matchBadge);
+        
+        // Title
         const title = document.createElement('h3');
         title.textContent = meal.strMeal;
         title.style.color = 'white';
         recipeDiv.appendChild(title);
         
-        // Recipe Image
+        // Image
         const image = document.createElement('img');
         image.src = meal.strMealThumb;
         image.style.width = '300px';
         image.style.borderRadius = '10px';
         recipeDiv.appendChild(image);
         
-        // Add click to get full details
+        // Click for full details
         recipeDiv.addEventListener('click', function() {
-            getFullRecipe(meal.idMeal);
+            showFullRecipe(meal);
         });
         
-        // Add the recipe to results
         resultsDiv.appendChild(recipeDiv);
     });
 }
 
-// Function to get full recipe details when clicked
-async function getFullRecipe(mealId) {
-    try {
-        const response = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${mealId}`);
-        const data = await response.json();
-        
-        if (data.meals && data.meals[0]) {
-            showFullRecipe(data.meals[0]);
-        }
-    } catch (error) {
-        alert('Error loading recipe details.');
-    }
-}
-
 // Function to show full recipe in a popup-style overlay
 function showFullRecipe(meal) {
-    // Create overlay
     const overlay = document.createElement('div');
     overlay.style.position = 'fixed';
     overlay.style.top = '0';
@@ -146,7 +213,6 @@ function showFullRecipe(meal) {
     overlay.style.overflowY = 'auto';
     overlay.style.padding = '20px';
     
-    // Create content container
     const content = document.createElement('div');
     content.style.backgroundColor = '#083368';
     content.style.maxWidth = '800px';
@@ -171,14 +237,14 @@ function showFullRecipe(meal) {
     closeBtn.addEventListener('click', () => overlay.remove());
     content.appendChild(closeBtn);
     
-    // Recipe Title
+    // Title
     const title = document.createElement('h2');
     title.textContent = meal.strMeal;
     title.style.color = 'white';
     title.style.marginTop = '0';
     content.appendChild(title);
     
-    // Recipe Image
+    // Image
     const image = document.createElement('img');
     image.src = meal.strMealThumb;
     image.style.width = '100%';
@@ -186,14 +252,13 @@ function showFullRecipe(meal) {
     image.style.borderRadius = '10px';
     content.appendChild(image);
     
-    // Ingredients heading
+    // Ingredients
     const ingredientsHeading = document.createElement('h3');
     ingredientsHeading.textContent = 'Ingredients:';
     ingredientsHeading.style.color = 'white';
     ingredientsHeading.style.marginTop = '20px';
     content.appendChild(ingredientsHeading);
     
-    // Ingredients list
     const ingredientsList = document.createElement('ul');
     ingredientsList.style.color = 'white';
     ingredientsList.style.textAlign = 'left';
@@ -224,7 +289,7 @@ function showFullRecipe(meal) {
     instructions.style.lineHeight = '1.6';
     content.appendChild(instructions);
     
-    // Video link (if available)
+    // Video link
     if (meal.strYoutube) {
         const videoLink = document.createElement('a');
         videoLink.href = meal.strYoutube;
@@ -237,7 +302,6 @@ function showFullRecipe(meal) {
         content.appendChild(videoLink);
     }
     
-    // Add content to overlay and overlay to page
     overlay.appendChild(content);
     document.body.appendChild(overlay);
 }
