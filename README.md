@@ -185,16 +185,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [TheMealDB](https://www.themealdb.com/) for providing the free recipe API
-- All contributors who help improve this project
-- The open-source community for inspiration
-
-## 📞 Contact
-
-Have questions or suggestions? Feel free to:
-- Open an issue
-- Submit a pull request
-- Contact us at: [your-email@example.com]
+[TheMealDB](https://www.themealdb.com/) for providing the free recipe API
 
 ---
 
